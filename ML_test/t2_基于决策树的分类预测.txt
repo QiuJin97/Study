@@ -1,0 +1,228 @@
+Part1 Demo实践
+	Step1:库函数导入
+	Step2:模型训练
+	Step3:数据和模型可视化
+	Step4:模型预测
+
+Part2 基于企鹅（penguins）数据集的决策树分类实践
+	Step1:库函数导入
+	Step2:数据读取/载入
+	Step3:数据信息简单查看
+	Step4:可视化描述
+	Step5:利用 决策树模型 在二分类上 进行训练和预测
+	Step6:利用 决策树模型 在三分类(多分类)上 进行训练和预测
+
+##  基础函数库
+import numpy as np 
+
+## 导入画图库
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+## 导入决策树模型函数
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
+
+##Demo演示LogisticRegression分类
+
+## 构造数据集
+x_fearures = np.array([[-1, -2], [-2, -1], [-3, -2], [1, 3], [2, 1], [3, 2]])
+y_label = np.array([0, 1, 0, 1, 0, 1])
+
+## 调用决策树回归模型
+tree_clf = DecisionTreeClassifier()
+
+## 调用决策树模型拟合构造的数据集
+tree_clf = tree_clf.fit(x_fearures, y_label)
+
+## 可视化构造的数据样本点
+plt.figure()
+plt.scatter(x_fearures[:,0],x_fearures[:,1], c=y_label, s=50, cmap='viridis')
+plt.title('Dataset')
+plt.show()
+
+## 可视化决策树
+import graphviz
+dot_data = tree.export_graphviz(tree_clf, out_file=None)
+graph = graphviz.Source(dot_data)
+graph.render("pengunis")
+
+## 创建新样本
+x_fearures_new1 = np.array([[0, -1]])
+x_fearures_new2 = np.array([[2, 1]])
+
+## 在训练集和测试集上分布利用训练好的模型进行预测
+y_label_new1_predict = tree_clf.predict(x_fearures_new1)
+y_label_new2_predict = tree_clf.predict(x_fearures_new2)
+
+print('The New point 1 predict class:\n',y_label_new1_predict)
+print('The New point 2 predict class:\n',y_label_new2_predict)
+
+
+基于企鹅数据集的决策树实战
+
+#下载需要用到的数据集
+!wget https://tianchi-media.oss-cn-beijing.aliyuncs.com/DSW/6tree/penguins_raw.csv
+
+##  基础函数库
+import numpy as np 
+import pandas as pd
+
+## 绘图函数库
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+## 我们利用Pandas自带的read_csv函数读取并转化为DataFrame格式
+
+data = pd.read_csv('./penguins_raw.csv')
+
+## 为了方便我们仅选取四个简单的特征，有兴趣的同学可以研究下其他特征的含义以及使用方法
+data = data[['Species','Culmen Length (mm)','Culmen Depth (mm)',
+            'Flipper Length (mm)','Body Mass (g)']]
+
+## 利用.info()查看数据的整体信息
+data.info()
+
+## 进行简单的数据查看，我们可以利用 .head() 头部.tail()尾部
+data.head()
+
+#这里我们发现数据集中存在NaN，一般的我们认为NaN在数据集中代表了缺失值，可能是数据采集或处理时产生的一种错误。这里我们采用-1将缺失值进行填补，还有其他例如“中位数填补、平均数填补”的缺失值处理方法有兴趣的同学也可以尝试。
+data = data.fillna(-1)
+
+data.tail()
+
+## 其对应的类别标签为'Adelie Penguin', 'Gentoo penguin', 'Chinstrap penguin'三种不同企鹅的类别。
+data['Species'].unique()
+
+## 利用value_counts函数查看每个类别数量
+pd.Series(data['Species']).value_counts()
+
+## 对于特征进行一些统计描述
+data.describe()
+
+## 特征与标签组合的散点可视化
+sns.pairplot(data=data, diag_kind='hist', hue= 'Species')
+plt.show()
+
+'''为了方便我们将标签转化为数字
+       'Adelie Penguin (Pygoscelis adeliae)'        ------0
+       'Gentoo penguin (Pygoscelis papua)'          ------1
+       'Chinstrap penguin (Pygoscelis antarctica)   ------2 '''
+
+def trans(x):
+    if x == data['Species'].unique()[0]:
+        return 0
+    if x == data['Species'].unique()[1]:
+        return 1
+    if x == data['Species'].unique()[2]:
+        return 2
+
+data['Species'] = data['Species'].apply(trans)
+
+for col in data.columns:
+    if col != 'Species':
+        sns.boxplot(x='Species', y=col, saturation=0.5, palette='pastel', data=data)
+        plt.title(col)
+        plt.show()
+
+# 选取其前三个特征绘制三维散点图
+from mpl_toolkits.mplot3d import Axes3D
+
+fig = plt.figure(figsize=(10,8))
+ax = fig.add_subplot(111, projection='3d')
+
+data_class0 = data[data['Species']==0].values
+data_class1 = data[data['Species']==1].values
+data_class2 = data[data['Species']==2].values
+# 'setosa'(0), 'versicolor'(1), 'virginica'(2)
+ax.scatter(data_class0[:,0], data_class0[:,1], data_class0[:,2],label=data['Species'].unique()[0])
+ax.scatter(data_class1[:,0], data_class1[:,1], data_class1[:,2],label=data['Species'].unique()[1])
+ax.scatter(data_class2[:,0], data_class2[:,1], data_class2[:,2],label=data['Species'].unique()[2])
+plt.legend()
+
+plt.show()
+
+## 为了正确评估模型性能，将数据划分为训练集和测试集，并在训练集上训练模型，在测试集上验证模型性能。
+from sklearn.model_selection import train_test_split
+
+## 选择其类别为0和1的样本 （不包括类别为2的样本）
+data_target_part = data[data['Species'].isin([0,1])][['Species']]
+data_features_part = data[data['Species'].isin([0,1])][['Culmen Length (mm)','Culmen Depth (mm)',
+            'Flipper Length (mm)','Body Mass (g)']]
+
+## 测试集大小为20%， 80%/20%分
+x_train, x_test, y_train, y_test = train_test_split(data_features_part, data_target_part, test_size = 0.2, random_state = 2020)
+
+## 从sklearn中导入决策树模型
+from sklearn.tree import DecisionTreeClassifier
+from sklearn import tree
+## 定义 决策树模型 
+clf = DecisionTreeClassifier(criterion='entropy')
+# 在训练集上训练决策树模型
+clf.fit(x_train, y_train)
+
+## 可视化
+import graphviz
+dot_data = tree.export_graphviz(clf, out_file=None)
+graph = graphviz.Source(dot_data)
+graph.render("penguins")
+
+## 在训练集和测试集上分布利用训练好的模型进行预测
+train_predict = clf.predict(x_train)
+test_predict = clf.predict(x_test)
+from sklearn import metrics
+
+## 利用accuracy（准确度）【预测正确的样本数目占总预测样本数目的比例】评估模型效果
+print('The accuracy of the Logistic Regression is:',metrics.accuracy_score(y_train,train_predict))
+print('The accuracy of the Logistic Regression is:',metrics.accuracy_score(y_test,test_predict))
+
+## 查看混淆矩阵 (预测值和真实值的各类情况统计矩阵)
+confusion_matrix_result = metrics.confusion_matrix(test_predict,y_test)
+print('The confusion matrix result:\n',confusion_matrix_result)
+
+# 利用热力图对于结果进行可视化
+plt.figure(figsize=(8, 6))
+sns.heatmap(confusion_matrix_result, annot=True, cmap='Blues')
+plt.xlabel('Predicted labels')
+plt.ylabel('True labels')
+plt.show()
+
+## 测试集大小为20%， 80%/20%分
+x_train, x_test, y_train, y_test = train_test_split(data[['Culmen Length (mm)','Culmen Depth (mm)',
+            'Flipper Length (mm)','Body Mass (g)']], data[['Species']], test_size = 0.2, random_state = 2020)
+## 定义 决策树模型 
+clf = DecisionTreeClassifier()
+# 在训练集上训练决策树模型
+clf.fit(x_train, y_train)
+
+## 在训练集和测试集上分布利用训练好的模型进行预测
+train_predict = clf.predict(x_train)
+test_predict = clf.predict(x_test)
+
+## 由于决策树模型是概率预测模型（前文介绍的 p = p(y=1|x,\theta)）,所有我们可以利用 predict_proba 函数预测其概率
+train_predict_proba = clf.predict_proba(x_train)
+test_predict_proba = clf.predict_proba(x_test)
+
+print('The test predict Probability of each class:\n',test_predict_proba)
+## 其中第一列代表预测为0类的概率，第二列代表预测为1类的概率，第三列代表预测为2类的概率。
+
+## 利用accuracy（准确度）【预测正确的样本数目占总预测样本数目的比例】评估模型效果
+print('The accuracy of the Logistic Regression is:',metrics.accuracy_score(y_train,train_predict))
+print('The accuracy of the Logistic Regression is:',metrics.accuracy_score(y_test,test_predict))
+
+## 查看混淆矩阵
+confusion_matrix_result = metrics.confusion_matrix(test_predict,y_test)
+print('The confusion matrix result:\n',confusion_matrix_result)
+
+# 利用热力图对于结果进行可视化
+plt.figure(figsize=(8, 6))
+sns.heatmap(confusion_matrix_result, annot=True, cmap='Blues')
+plt.xlabel('Predicted labels')
+plt.ylabel('True labels')
+plt.show()
+
+
+
+
+
+
